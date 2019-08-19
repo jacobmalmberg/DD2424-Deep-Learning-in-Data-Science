@@ -42,3 +42,5 @@ by character. AdaGrad was used to train the network. Text was synthethized from 
 
 * ’hating Obamahine. I wall the worst, PAMCNELDED, was heve bad ald
 correc’
+*  ’Obama is a prangill who okel A Tive Beever Hillary Clinton of Jond
+Trum’
