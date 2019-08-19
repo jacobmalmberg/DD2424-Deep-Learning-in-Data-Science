@@ -1,0 +1,298 @@
+
+%load entire dataset
+load('X.mat'); %Dxnlen
+load('ys.mat'); %Nx1
+
+load('trainX.mat'); %training dataset
+load('trainY.mat'); %training dataset
+train_one_hot = one_hot_encode_y(trainY);
+
+[trainX, trainY, train_one_hot] = shuffle_dataset(trainX,trainY,train_one_hot); % shuffle it
+
+load('validationX.mat'); %validation
+load('validationY.mat');
+validation_one_hot = one_hot_encode_y(validationY);
+
+%load debug data/matrices
+load('DebugInfo.mat');
+
+rng(401);
+y_one_hot=one_hot_encode_y(ys);
+
+
+%N= size(ys,1);
+
+K = max(unique(ys)); %18
+d = 28; %28
+nlen = 19;
+
+n1 = 5; %no filters in layer 1
+k1 = 5; %width of filter
+nlen1 = nlen-k1+1;
+
+n2 = 5;
+k2 = 5;
+nlen2 = nlen1-k2+1;
+
+fsize = n2*nlen2;
+
+sig1=1/sqrt(d); %hur?!
+sig2=1/sqrt(n1);
+sig3=1/sqrt(K);
+
+ConvNet.F{1} = randn(d,k1,n1)*sig1;
+ConvNet.F{2} = randn(n1,k2,n2)*sig2;
+ConvNet.W = randn(K, fsize)*sig3;
+
+% epochs etc
+
+eta = .001;
+n_epochs = 10; %s.t. samples = 197980
+n_batch = 95; % = 2084 update steps
+update_steps = (n_epochs*size(trainX,2))/n_batch;
+n_update = 500;
+
+
+% graph stuff
+x_axis = 0:n_update:update_steps; % x-axeln.
+x_axis = [x_axis update_steps]; %include last updatept too
+
+train_loss = zeros(length(x_axis),1);
+validation_loss = zeros(length(x_axis),1);
+
+train_acc = zeros(length(x_axis),1);
+validation_acc = zeros(length(x_axis),1);
+
+save_iter=1; % for index counting
+
+
+%debug stuff
+%MF=MakeMFMatrix(F, nlen);
+%MF=MakeMFMatrix(ConvNet.F{1}, nlen);
+% %[d,k,nf] = size(ConvNet.F{1});
+% [d,k,nf] = size(F);
+% %x_input2 = randn(4,4);
+% %x_input2 = x_input2(:);
+% MX = MakeMXMatrix(x_input, d, k, nf);
+
+%Gradienten för W  stämmed för 28x5x5, nbatch=1!
+%Även MakeMF, MakeMX
+%Även gradienterna för F1,F2 med nbatch=1!
+%TODO: större batcher, andra filter.
+
+%ConvNet.F{1}=F;
+% Gradient debug
+
+% X_batch = X(:,:);
+% Ys_batch=y_one_hot(:,:);
+% % 
+% h=1e-6;
+% tic
+% Gs = NumericalGradient(X_batch, Ys_batch, ConvNet, h);
+% [grad_W, grad_F1, grad_F2] = ComputeGradients(X_batch, Ys_batch, ConvNet);
+% toc
+% grad_W_rel_error = abs(grad_W - Gs{3}) ./ max(eps, abs(grad_W) + abs(Gs{3}));
+% grad_F1_rel_error = abs(grad_F1 - Gs{1}) ./ max(eps, abs(grad_F1) + abs(Gs{1}));
+% grad_F2_rel_error = abs(grad_F2 - Gs{2}) ./ max(eps, abs(grad_F2) + abs(Gs{2}));
+% 
+% max_W_rel_error = max(max(grad_W_rel_error));
+% max_F1_rel_error = max(max(max(grad_F1_rel_error)));
+% max_F2_rel_error = max(max(max(grad_F2_rel_error)));
+% max_matrix = [max_W_rel_error; max_F1_rel_error; max_F2_rel_error];
+% max(max_matrix)
+%     
+% loss = Compute_loss(X_batch, Ys_batch, ConvNet)
+%acc = ComputeAccuracy(X(:,1:10000), ys(1:10000), ConvNet);
+
+
+for i=1:n_epochs
+    for j=1:N/n_batch
+        
+        j_start = (j-1)*n_batch+1;
+        j_end = j*n_batch;
+        inds = j_start:j_end;
+        X_batch = trainX(:, inds);
+        Y_batch = trainY(:, inds);
+        training_one_hot_batch = train_one_hot(:, j_start:j_end);
+        [W, b] = MiniBatchGD(X_batch, training_one_hot_batch, W, b, lambda, eta);
+    
+    
+    if ((i == 1) && (j == 1 )) || (ismember(t,x_axis)) 
+        X_batch, Ys_batch, ConvNet)
+        train_loss(save_iter) = Compute_loss(trainX, train_one_hot, ConvNet);
+        validation_loss(save_iter) = ComputeCost(validationX, validation_one_hot, W, b, lambda);
+        
+        train_acc(save_iter) = ComputeAccuracy(trainX, trainY, W, b);
+        validation_acc(save_iter) = ComputeAccuracy(validationX, validationY, W, b);
+        
+        save_iter = save_iter +1;
+    end
+    
+    end
+
+end
+
+
+
+
+function MF = MakeMFMatrix(F, nlen)
+
+[dd, k, nf] = size(F); %%dd = 28
+dd;
+MF = zeros((nlen-k+1)*nf, (nlen*dd));
+
+%now convert F matrices into vectors
+v_matrix = zeros(nf, dd*k); % VF, dd*k = numel(filter)
+for i=1:nf
+    v = F(:,:,i); %get a filter
+    v = v(:)'; % turn it into a vec and transp
+    v_matrix(i,:) = v; % into the matrix
+end
+
+%now put it into the MF matrix
+
+v_len = dd*k; % length of vectorized filter
+
+start_col=1; % which column to start writing to
+for j=1:nf:size(MF,1)
+    j;
+    nf;
+    end_row = nf+j-1; % which row to stop writing to
+    end_col = v_len+(start_col-1); % which col to stop writing to
+    MF(j:end_row, start_col:end_col) = v_matrix;
+    start_col = start_col +dd; % increment startcolumn
+
+end
+end
+
+function MX = MakeMXMatrix(x_input, d, k, nf)
+nlen = size(x_input,1)/d; % what if X is a giant matrix? hardcode? it never is!
+%nlen = 19;
+
+X_input = reshape(x_input, [d, nlen]); %make it into a matrix
+MX = zeros((nlen-k+1)*nf, (k*nf*d));
+
+start_column=1;
+for i=1:nf:size(MX,1)
+    vecX = X_input(:,start_column:start_column+k-1); % get the vector belonging to the columns
+    vecX = vecX(:)';  % turn it into a vec and transp
+    repeated_vecX = repmat({vecX}, 1, nf); %repeat it, so it can be diagonalized
+    diag_vecX = blkdiag(repeated_vecX{:}); % https://se.mathworks.com/matlabcentral/answers/39838-repeat-a-matrix-as-digonal-element-in-a-new-matrix
+    MX(i:i+nf-1,:) = diag_vecX; % set it to diagonal
+    start_column = start_column + 1; % increment start column, 1 since stride =1
+end
+
+end
+
+function [grad_W, grad_F1, grad_F2] = ComputeGradients(X_batch, Y, ConvNet)
+
+N = size(Y,2); % datapoints in batch
+% set to 0
+% grad_W = zeros(size(ConvNet.W));
+grad_F1 = zeros(size(ConvNet.F{1}));
+grad_F2 = zeros(size(ConvNet.F{2}));
+
+[P_batch, X_batch1, X_batch2] = EvaluateClassifier(X_batch, ConvNet);
+
+g_batch = -(Y-P_batch); %KxN
+grad_W = 1/N * g_batch*X_batch2'; 
+
+% propagate
+g_batch = ConvNet.W'*g_batch; % n2*nlen2 x N
+g_batch = g_batch .* (X_batch2 > 0); % n2*nlen2 x N, indicator function
+
+%compute the gradient wrt the 2nd layer conv filters
+%[d,k1,n1] = size(ConvNet.F{2}); %get dimensions for first layer
+%[d,k2,nf] = size(ConvNet.F{2}); %get dimensions for second layer
+[d,k,nf] = size(ConvNet.F{2}); %get dimensions for second layer
+
+for j = 1:N
+    g_j = g_batch(:,j);
+    x_j = X_batch1(:,j);
+    MX = MakeMXMatrix(x_j, d, k, nf);
+    
+    v = g_j'*MX;
+    size(v);
+    size(grad_F2);
+    reshaped_v = reshape(v,[d,k,nf]); %reshape so it fits, page12
+    grad_F2 = grad_F2 + 1/N * reshaped_v;
+end
+
+%propagate again
+
+%make MF
+nlen=19; %hardcode?
+[~,k1,~] = size(ConvNet.F{1});
+
+nlen1 = nlen-k1+1;
+
+MF2=MakeMFMatrix(ConvNet.F{2}, nlen1);
+g_batch = MF2'*g_batch;
+g_batch = g_batch .* (X_batch1 > 0);
+
+%compute the gradient wrt first layer conv layers
+[d,k,nf] = size(ConvNet.F{1}); %get dimensions for first layer
+
+for j = 1:N
+    g_j = g_batch(:,j);
+    x_j = X_batch(:,j);
+    MX = MakeMXMatrix(x_j, d, k, nf);
+    v = g_j' * MX;
+    reshaped_v = reshape(v,[d,k,nf]); %reshape so it fits, page12
+    grad_F1 = grad_F1 + 1/N * reshaped_v;
+end
+end
+
+function loss = Compute_loss(X_batch, Ys_batch, ConvNet)
+%Ys is one-hot encoded
+
+[P, ~, ~] = EvaluateClassifier(X_batch, ConvNet);
+sum_loss = sum(-log(dot(double(Ys_batch),P)));
+N = size(X_batch,2); % Assuming the second column is N
+loss = 1/N * sum_loss;
+
+end
+
+function [acc, I, y] = ComputeAccuracy(X,y,ConvNet)
+%5
+[P, ~, ~] = EvaluateClassifier(X, ConvNet);
+[~,I] = max(P, [], 1); %argmax
+N = size(y,1);
+I=I';
+acc = sum(y==I)/N;
+end
+
+
+function [P_batch, X_batch1, X_batch2] = EvaluateClassifier(X_batch,ConvNet)
+%aka forward pass, p7
+nlen=19; %hardcode?
+[~,k1,~] = size(ConvNet.F{1});
+
+MF1=MakeMFMatrix(ConvNet.F{1}, nlen);
+X_batch1 = max(MF1*X_batch,0);
+
+%nlen1=size(X_batch1,2)% p2 
+nlen1 = nlen-k1+1;
+MF2=MakeMFMatrix(ConvNet.F{2}, nlen1);
+X_batch2 = max(MF2*X_batch1,0);
+
+S_batch = ConvNet.W*X_batch2;
+P_batch = softmax(S_batch); % ???
+
+end
+
+function y_o_h = one_hot_encode_y(ys)
+Y = ys == 1:max(ys);
+y_o_h = Y';
+end
+
+function [shTrainX, shTrainY, shX_one_hot] = shuffle_dataset(trainX, trainY, train_one_hot)
+%since the dataset is not shuffled
+ny = size(trainX,2) ;
+shuffle = randsample(1:ny,ny);
+shTrainX = trainX(:,shuffle);
+shX_one_hot = train_one_hot(:, shuffle);
+shTrainY = trainY(shuffle);
+end
+
+
